@@ -215,6 +215,317 @@ function renderJsonWithHighlights(
   return <span>{String(obj)}</span>;
 }
 
+// Simple markdown renderer for AI explanation
+function renderMarkdown(text: string): JSX.Element {
+  if (!text) return <></>;
+  
+  const lines = text.split('\n');
+  const elements: JSX.Element[] = [];
+  let currentParagraph: string[] = [];
+  let inCodeBlock = false;
+  let codeBlockLang = '';
+  let codeBlockContent: string[] = [];
+  let inList = false;
+  let listItems: string[] = [];
+  
+  const processParagraph = () => {
+    if (currentParagraph.length > 0) {
+      const paraText = currentParagraph.join(' ').trim();
+      if (paraText) {
+        elements.push(
+          <p key={elements.length} className="mb-3 last:mb-0">
+            {renderInlineMarkdown(paraText)}
+          </p>
+        );
+      }
+      currentParagraph = [];
+    }
+  };
+  
+  const processList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={elements.length} className="list-disc list-inside mb-3 space-y-1 ml-4">
+          {listItems.map((item, idx) => (
+            <li key={idx} className="ml-2">
+              {renderInlineMarkdown(item.trim().replace(/^[-*+]\s+/, ''))}
+            </li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+      inList = false;
+    }
+  };
+  
+  const processCodeBlock = () => {
+    if (codeBlockContent.length > 0) {
+      elements.push(
+        <pre key={elements.length} className="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto mb-3 text-xs font-mono border border-gray-700">
+          <code className="text-gray-100">{codeBlockContent.join('\n')}</code>
+        </pre>
+      );
+      codeBlockContent = [];
+      inCodeBlock = false;
+      codeBlockLang = '';
+    }
+  };
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    // Code blocks
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        processCodeBlock();
+      } else {
+        processParagraph();
+        processList();
+        codeBlockLang = trimmed.substring(3).trim();
+        inCodeBlock = true;
+      }
+      continue;
+    }
+    
+    if (inCodeBlock) {
+      codeBlockContent.push(line);
+      continue;
+    }
+    
+    // Headers
+    if (trimmed.match(/^#{1,6}\s+/)) {
+      processParagraph();
+      processList();
+      const level = trimmed.match(/^#+/)?.[0].length || 1;
+      const text = trimmed.replace(/^#+\s+/, '');
+      const HeaderTag = `h${Math.min(level, 6)}` as keyof JSX.IntrinsicElements;
+      const className = level === 1 ? 'text-xl font-bold mb-2 mt-4' :
+                       level === 2 ? 'text-lg font-bold mb-2 mt-4' :
+                       level === 3 ? 'text-base font-semibold mb-2 mt-3' :
+                       'text-sm font-semibold mb-1 mt-2';
+      elements.push(
+        <HeaderTag key={elements.length} className={className}>
+          {renderInlineMarkdown(text)}
+        </HeaderTag>
+      );
+      continue;
+    }
+    
+    // List items
+    if (trimmed.match(/^[-*+]\s+/)) {
+      if (!inList) {
+        processParagraph();
+        inList = true;
+      }
+      listItems.push(trimmed);
+      continue;
+    } else if (inList) {
+      processList();
+    }
+    
+    // Horizontal rule
+    if (trimmed.match(/^[-*_]{3,}$/)) {
+      processParagraph();
+      processList();
+      elements.push(<hr key={elements.length} className="my-4 border-gray-300" />);
+      continue;
+    }
+    
+    // Empty line
+    if (trimmed === '') {
+      processParagraph();
+      processList();
+      continue;
+    }
+    
+    // Regular paragraph text
+    currentParagraph.push(line);
+  }
+  
+  // Process remaining content
+  processParagraph();
+  processList();
+  processCodeBlock();
+  
+  return <div>{elements}</div>;
+}
+
+// Render inline markdown (bold, italic, code, links)
+function renderInlineMarkdown(text: string): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = [];
+  
+  // Process text character by character to handle nested/overlapping patterns
+  // We'll process in order: code blocks (highest priority), links, bold, italic
+  
+  // First, find all code spans (highest priority - they can't contain other markdown)
+  const codeMatches: Array<{start: number, end: number, content: string}> = [];
+  const codePattern = /`([^`]+)`/g;
+  let match;
+  while ((match = codePattern.exec(text)) !== null) {
+    codeMatches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      content: match[1]
+    });
+  }
+  
+  // Then find all bold patterns (**text** or __text__)
+  const boldMatches: Array<{start: number, end: number, content: string}> = [];
+  const boldPattern = /(\*\*|__)(.+?)\1/g;
+  while ((match = boldPattern.exec(text)) !== null) {
+    // Check if this bold match overlaps with any code match
+    const overlapsCode = codeMatches.some(cm => 
+      (match!.index < cm.end && match!.index + match![0].length > cm.start)
+    );
+    if (!overlapsCode) {
+      boldMatches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        content: match[2]
+      });
+    }
+  }
+  
+  // Find all links [text](url)
+  const linkMatches: Array<{start: number, end: number, content: string, url: string}> = [];
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  while ((match = linkPattern.exec(text)) !== null) {
+    const overlapsCode = codeMatches.some(cm => 
+      (match!.index < cm.end && match!.index + match![0].length > cm.start)
+    );
+    if (!overlapsCode) {
+      linkMatches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        content: match[1],
+        url: match[2]
+      });
+    }
+  }
+  
+  // Find italic patterns (*text* or _text_) - but avoid overlapping with bold or code
+  const italicMatches: Array<{start: number, end: number, content: string}> = [];
+  // Use a simple approach: find single * or _ that aren't part of ** or __
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '*' && i + 1 < text.length && text[i + 1] !== '*') {
+      // Potential italic start with *
+      const endIdx = text.indexOf('*', i + 1);
+      if (endIdx > i + 1 && (endIdx + 1 >= text.length || text[endIdx + 1] !== '*')) {
+        const content = text.substring(i + 1, endIdx);
+        const overlapsCode = codeMatches.some(cm => i < cm.end && endIdx + 1 > cm.start);
+        const overlapsBold = boldMatches.some(bm => i < bm.end && endIdx + 1 > bm.start);
+        const overlapsLink = linkMatches.some(lm => i < lm.end && endIdx + 1 > lm.start);
+        if (!overlapsCode && !overlapsBold && !overlapsLink && content.length > 0) {
+          italicMatches.push({
+            start: i,
+            end: endIdx + 1,
+            content: content
+          });
+          i = endIdx + 1;
+          continue;
+        }
+      }
+    } else if (text[i] === '_' && i + 1 < text.length && text[i + 1] !== '_') {
+      // Potential italic start with _
+      const endIdx = text.indexOf('_', i + 1);
+      if (endIdx > i + 1 && (endIdx + 1 >= text.length || text[endIdx + 1] !== '_')) {
+        const content = text.substring(i + 1, endIdx);
+        const overlapsCode = codeMatches.some(cm => i < cm.end && endIdx + 1 > cm.start);
+        const overlapsBold = boldMatches.some(bm => i < bm.end && endIdx + 1 > bm.start);
+        const overlapsLink = linkMatches.some(lm => i < lm.end && endIdx + 1 > lm.start);
+        if (!overlapsCode && !overlapsBold && !overlapsLink && content.length > 0) {
+          italicMatches.push({
+            start: i,
+            end: endIdx + 1,
+            content: content
+          });
+          i = endIdx + 1;
+          continue;
+        }
+      }
+    }
+    i++;
+  }
+  
+  // Combine all matches and sort by start position
+  const allMatches: Array<{start: number, end: number, type: string, content: string, url?: string}> = [
+    ...codeMatches.map(m => ({...m, type: 'code' as const})),
+    ...linkMatches.map(m => ({...m, type: 'link' as const, url: m.url})),
+    ...boldMatches.map(m => ({...m, type: 'bold' as const})),
+    ...italicMatches.map(m => ({...m, type: 'italic' as const}))
+  ];
+  
+  // Sort by start position, and if same start, prioritize: code > link > bold > italic
+  const priority: Record<string, number> = { code: 4, link: 3, bold: 2, italic: 1 };
+  allMatches.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return (priority[b.type] || 0) - (priority[a.type] || 0);
+  });
+  
+  // Remove overlapping matches (keep higher priority)
+  const filteredMatches: typeof allMatches = [];
+  for (const match of allMatches) {
+    const overlaps = filteredMatches.some(m => 
+      (match.start < m.end && match.end > m.start)
+    );
+    if (!overlaps) {
+      filteredMatches.push(match);
+    }
+  }
+  
+  // Build parts array
+  let currentIndex = 0;
+  for (const match of filteredMatches) {
+    // Add text before match
+    if (match.start > currentIndex) {
+      parts.push(text.substring(currentIndex, match.start));
+    }
+    
+    // Add matched element
+    const key = `${match.type}-${match.start}`;
+    switch (match.type) {
+      case 'bold':
+        parts.push(<strong key={key} className="font-bold">{match.content}</strong>);
+        break;
+      case 'italic':
+        parts.push(<em key={key} className="italic">{match.content}</em>);
+        break;
+      case 'code':
+        parts.push(<code key={key} className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded text-xs font-mono border border-blue-200">{match.content}</code>);
+        break;
+      case 'link':
+        parts.push(
+          <a 
+            key={key} 
+            href={match.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-900 hover:text-blue-700 underline font-medium"
+          >
+            {match.content}
+          </a>
+        );
+        break;
+    }
+    
+    currentIndex = match.end;
+  }
+  
+  // Add remaining text
+  if (currentIndex < text.length) {
+    parts.push(text.substring(currentIndex));
+  }
+  
+  // If no matches, return the text as-is
+  if (parts.length === 0) {
+    return [text];
+  }
+  
+  return parts;
+}
+
 export default function Page() {
   const [oldUrl,setOldUrl]=useState(""); const [newUrl,setNewUrl]=useState("");
   const [oldFile,setOldFile]=useState<File|null>(null); const [newFile,setNewFile]=useState<File|null>(null);
@@ -632,9 +943,9 @@ export default function Page() {
 
                   {ragOutput && (
                     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h6 className="text-sm font-semibold text-blue-900 mb-2">AI Explanation:</h6>
-                      <div className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed">
-                        {ragOutput}
+                      <h6 className="text-sm font-semibold text-blue-900 mb-3">AI Explanation:</h6>
+                      <div className="text-sm text-blue-800 leading-relaxed prose prose-sm max-w-none">
+                        {renderMarkdown(ragOutput)}
                       </div>
                     </div>
                   )}
