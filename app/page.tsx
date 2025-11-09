@@ -16,13 +16,13 @@ function getHighlightClass(path: string, report: DiffReport | null, isOld: boole
   if (!change) return "";
   
   if (change.kind === "REMOVED_FIELD") {
-    return isOld ? "bg-red-50 border-l-4 border-[#D62311] py-1 px-2 -mx-2 rounded-r" : "";
+    return isOld ? "bg-red-100 border-l-4 border-[#D62311] py-0.5 px-2 -mx-2 my-0.5 rounded-r block" : "";
   }
   if (change.kind === "ADDED_FIELD") {
-    return isOld ? "" : "bg-green-50 border-l-4 border-green-600 py-1 px-2 -mx-2 rounded-r";
+    return isOld ? "" : "bg-green-100 border-l-4 border-green-600 py-0.5 px-2 -mx-2 my-0.5 rounded-r block";
   }
   if (change.kind === "TYPE_CHANGED") {
-    return "bg-amber-50 border-l-4 border-amber-600 py-1 px-2 -mx-2 rounded-r";
+    return "bg-amber-100 border-l-4 border-amber-600 py-0.5 px-2 -mx-2 my-0.5 rounded-r block";
   }
   return "";
 }
@@ -78,21 +78,57 @@ function renderJsonWithHighlights(
   if (typeof obj === "object") {
     const keys = Object.keys(obj);
     const highlight = getHighlightClass(currentPath, report, isOld);
+    // Check if this object itself has a TYPE_CHANGED (e.g., changed from string to object)
+    const hasTypeChange = report?.changes.some(c => (c as any).path === currentPath && c.kind === "TYPE_CHANGED");
     
     if (keys.length === 0) {
       return <span className={highlight}>{`{}`}</span>;
     }
     
+    // If this object has a TYPE_CHANGED, wrap the entire object content in the highlight
+    // This makes it clear that the entire structure changed
+    if (hasTypeChange && highlight) {
+      return (
+        <span className={`${highlight} block`}>
+          <span className={highlight}>{`{`}</span>
+          <br />
+          {keys.map((key, i) => {
+            const keyPath = currentPath ? `${currentPath}.${key}` : key;
+            const valueChange = report?.changes.find(c => (c as any).path === keyPath);
+            const hasChange = valueChange !== undefined;
+            const changeHighlight = hasChange ? getHighlightClass(keyPath, report, isOld) : highlight;
+            
+            return (
+              <span key={key} className={changeHighlight}>
+                <span>{indentStr}  </span>
+                <span className="text-[#003478] font-medium">"{key}"</span>
+                <span>: </span>
+                {renderJsonWithHighlights(obj[key], report, isOld, keyPath, indent + 1)}
+                {i < keys.length - 1 && <span>,</span>}
+                <br />
+              </span>
+            );
+          })}
+          <span>{indentStr}</span>
+          <span className={highlight}>{`}`}</span>
+        </span>
+      );
+    }
+    
+    // Normal rendering when no TYPE_CHANGED at this level
     return (
       <>
         <span className={highlight}>{`{`}</span>
         <br />
         {keys.map((key, i) => {
           const keyPath = currentPath ? `${currentPath}.${key}` : key;
-          const valueHighlight = getHighlightClass(keyPath, report, isOld);
-          const hasHighlight = valueHighlight !== "";
+          const valueChange = report?.changes.find(c => (c as any).path === keyPath);
+          const hasChange = valueChange !== undefined;
+          const changeHighlight = hasChange ? getHighlightClass(keyPath, report, isOld) : "";
+          
+          // Wrap the entire key-value pair in highlight if there's a change
           return (
-            <span key={key} className={hasHighlight ? `block ${valueHighlight}` : ""}>
+            <span key={key} className={hasChange ? changeHighlight : ""}>
               <span>{indentStr}  </span>
               <span className="text-[#003478] font-medium">"{key}"</span>
               <span>: </span>
@@ -134,6 +170,25 @@ export default function Page() {
   }
 
   function loadSamples(){ setOldUrl("/samples/v1.json"); setNewUrl("/samples/v2.json"); }
+  
+  function loadSampleFromAPI() {
+    setError(null);
+    // Use real API endpoints - GitHub API is a good example
+    // These will show schema differences when analyzed
+    const sampleApiUrl1 = "https://api.github.com/users/octocat";
+    const sampleApiUrl2 = "https://api.github.com/users/github";
+    
+    // Just set the URLs - don't fetch or analyze yet
+    // User will click "Analyze APIs" button to fetch and show the preview
+    setOldUrl(sampleApiUrl1);
+    setNewUrl(sampleApiUrl2);
+    
+    // Clear previous results so user can see fresh analysis
+    setOldJson(null);
+    setNewJson(null);
+    setReport(null);
+    setScore(null);
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -157,6 +212,12 @@ export default function Page() {
                 className="text-sm hover:underline"
               >
                 Load Samples
+              </button>
+              <button 
+                onClick={loadSampleFromAPI}
+                className="text-sm hover:underline"
+              >
+                Load Sample from API
               </button>
             </div>
           </div>
