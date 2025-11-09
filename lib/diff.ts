@@ -10,8 +10,26 @@ function typ(v: any): string { if (v === null) return "null"; if (Array.isArray(
 function walk(obj: any, base: string, out: Record<string,string>, seen=new WeakSet()) {
   if (obj && typeof obj === "object") { if (seen.has(obj)) return; seen.add(obj); }
   const t=typ(obj);
-  if (t==="object") for (const k of Object.keys(obj)) walk(obj[k], base?`${base}.${k}`:k, out, seen);
-  else if (t==="array") out[base]="array"; else out[base]=t;
+  
+  // Always record the type at the current path (including for objects and arrays)
+  // This allows us to detect when a field changes from a primitive to an object/array or vice versa
+  if (base) {
+    out[base] = t;
+  }
+  
+  // Then recursively walk into objects and arrays to get nested field types
+  if (t==="object") {
+    for (const k of Object.keys(obj)) {
+      walk(obj[k], base?`${base}.${k}`:k, out, seen);
+    }
+  } else if (t==="array") {
+    // For arrays, we record the array type at base (already done above)
+    // Optionally, we could also record types of array elements, but for now we just mark it as array
+    if (obj.length > 0 && typeof obj[0] === "object" && !Array.isArray(obj[0])) {
+      // If array contains objects, walk into the first element to get nested structure
+      walk(obj[0], base ? `${base}[]` : "[]", out, seen);
+    }
+  }
 }
 
 export function diffSchemas(oldJson:any, newJson:any): DiffReport {

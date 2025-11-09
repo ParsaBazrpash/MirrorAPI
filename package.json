@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "cli": "tsx scripts/cli.ts"
-},
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "cli": "tsx scripts/cli.ts",
+    "server": "node server.js",
+    "dev:all": "concurrently \"npm run server\" \"npm run dev\""
+  },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
