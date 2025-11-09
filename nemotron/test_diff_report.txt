@@ -1,0 +1,18 @@
+API Schema Migration Changes Report
+=====================================
+
+Summary:
+- Added Fields: 2
+- Removed Fields: 1
+- Risky Changes: 3
+
+Detailed Changes:
+================
+
+1. REMOVED: Field "user.email" (type: string) was removed from the API.
+
+2. ADDED: Field "user.contact.email" (type: string) was added to the API.
+
+3. ADDED: Field "user.contact.phone" (type: string) was added to the API.
+
+4. TYPE CHANGED: Field "user.age" changed from number to string.

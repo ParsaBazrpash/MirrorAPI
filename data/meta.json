@@ -1,0 +1,1 @@
+{"meta": [{"id": "diff_report.txt#0", "text": "API Schema Migration Changes Report\n=====================================\n\nSummary:\n- Added Fields: 0\n- Removed Fields: 0\n- Risky Changes: 2\n\nDetailed Changes:\n================\n\n1. TYPE CHANGED: Field \"company\" changed from string to null.\n\n2. TYPE CHANGED: Field \"bio\" changed from null to string."}], "dim": 384}
