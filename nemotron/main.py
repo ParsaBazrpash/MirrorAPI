@@ -132,7 +132,7 @@ async def generate(payload: GenerateIn):
         import json
         
         # Get NVIDIA API key from environment
-        nvidia_api_key = os.getenv("NVIDIA_API_KEY", "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")
+        nvidia_api_key = os.getenv("NVIDIA_API_KEY", "x")
         
         client = OpenAI(
             base_url="https://integrate.api.nvidia.com/v1",
@@ -289,3 +289,4 @@ if __name__ == "__main__":
     uvicorn.run(nemotron, host="0.0.0.0", port=8000)
     
     
+
