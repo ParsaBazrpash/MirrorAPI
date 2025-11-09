@@ -1,8 +1,7 @@
 {
-    "id": "TX-293812",
+    "id": 293812,
     "customer": { "full_name": "John Doe", "customer_id": "C-991" },
-    "premium": "189.24",
+    "premium": 189.24,
     "coverage": { "collision": true, "liability": true },
-    "claimSubmissionDate": "2025-10-01"
+    "status": "active"
   }
-  
