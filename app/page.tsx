@@ -562,7 +562,12 @@ export default function Page() {
     }catch(e:any){ setError(e.message||"Analysis failed"); } finally{ setLoading(false); }
   }
 
-  function loadSamples(){ setOldUrl("/samples/v1.json"); setNewUrl("/samples/v2.json"); }
+  function loadSamples(){ 
+    setOldUrl("/samples/v1.json"); setNewUrl("/samples/v2.json"); 
+    setRagOutput(null);
+    setRagError(null);
+    setRagLoading(false);
+  }
 
   // Format diff report as text for RAG ingestion
   function formatDiffReportForRAG(report: DiffReport | null): string {
@@ -687,6 +692,9 @@ export default function Page() {
   
   function loadSampleFromAPI() {
     setError(null);
+    setRagOutput(null);
+    setRagError(null);
+    setRagLoading(false);
     // Use real API endpoints - GitHub API is a good example
     // These will show schema differences when analyzed
     const sampleApiUrl1 = "https://api.github.com/users/octocat";
