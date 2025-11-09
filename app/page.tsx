@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { diffSchemas, type DiffReport } from "@/lib/diff";
 import { scoreDiff } from "@/lib/score";
-
-type DiffLine = { type: "added" | "removed" | "unchanged"; oldLine?: string; newLine?: string; oldNum?: number; newNum?: number };
 
 function formatJson(obj: any): string {
   return JSON.stringify(obj, null, 2);
@@ -17,13 +16,13 @@ function getHighlightClass(path: string, report: DiffReport | null, isOld: boole
   if (!change) return "";
   
   if (change.kind === "REMOVED_FIELD") {
-    return isOld ? "bg-red-100 border-l-4 border-red-500 py-0.5 px-2 -mx-2 rounded-r" : "";
+    return isOld ? "bg-red-50 border-l-4 border-[#D62311] py-1 px-2 -mx-2 rounded-r" : "";
   }
   if (change.kind === "ADDED_FIELD") {
-    return isOld ? "" : "bg-green-100 border-l-4 border-green-500 py-0.5 px-2 -mx-2 rounded-r";
+    return isOld ? "" : "bg-green-50 border-l-4 border-green-600 py-1 px-2 -mx-2 rounded-r";
   }
   if (change.kind === "TYPE_CHANGED") {
-    return "bg-amber-100 border-l-4 border-amber-500 py-0.5 px-2 -mx-2 rounded-r";
+    return "bg-amber-50 border-l-4 border-amber-600 py-1 px-2 -mx-2 rounded-r";
   }
   return "";
 }
@@ -95,7 +94,7 @@ function renderJsonWithHighlights(
           return (
             <span key={key} className={hasHighlight ? `block ${valueHighlight}` : ""}>
               <span>{indentStr}  </span>
-              <span className="text-blue-600">"{key}"</span>
+              <span className="text-[#003478] font-medium">"{key}"</span>
               <span>: </span>
               {renderJsonWithHighlights(obj[key], report, isOld, keyPath, indent + 1)}
               {i < keys.length - 1 && <span>,</span>}
@@ -112,82 +111,18 @@ function renderJsonWithHighlights(
   return <span>{String(obj)}</span>;
 }
 
-// Simple LCS-based diff algorithm
-function computeLCS(oldLines: string[], newLines: string[]): number[][] {
-  const m = oldLines.length;
-  const n = newLines.length;
-  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
-  
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (oldLines[i - 1] === newLines[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-  
-  return dp;
-}
-
-function generateDiffLines(oldJson: any, newJson: any): DiffLine[] {
-  const oldStr = formatJson(oldJson);
-  const newStr = formatJson(newJson);
-  const oldLines = oldStr.split("\n");
-  const newLines = newStr.split("\n");
-  
-  const dp = computeLCS(oldLines, newLines);
-  
-  // Backtrack to build diff
-  let i = oldLines.length;
-  let j = newLines.length;
-  const result: DiffLine[] = [];
-  
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      result.unshift({
-        type: "unchanged",
-        oldLine: oldLines[i - 1],
-        newLine: newLines[j - 1],
-        oldNum: i,
-        newNum: j
-      });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({
-        type: "added",
-        newLine: newLines[j - 1],
-        newNum: j
-      });
-      j--;
-    } else if (i > 0 && (j === 0 || dp[i - 1][j] >= dp[i][j - 1])) {
-      result.unshift({
-        type: "removed",
-        oldLine: oldLines[i - 1],
-        oldNum: i
-      });
-      i--;
-    }
-  }
-  
-  return result;
-}
-
 export default function Page() {
   const [oldUrl,setOldUrl]=useState(""); const [newUrl,setNewUrl]=useState("");
   const [oldFile,setOldFile]=useState<File|null>(null); const [newFile,setNewFile]=useState<File|null>(null);
   const [oldJson,setOldJson]=useState<any>(null); const [newJson,setNewJson]=useState<any>(null);
   const [report,setReport]=useState<DiffReport|null>(null); const [score,setScore]=useState<number| null>(null);
   const [loading,setLoading]=useState(false); const [error,setError]=useState<string| null>(null);
-  const [showDiff,setShowDiff]=useState(false);
 
   const loadJsonFromFile = async (f:File)=>JSON.parse(await f.text());
   const loadJsonFromUrl = async (url:string)=>{ const r=await fetch(`/api/fetch?url=${encodeURIComponent(url)}`); if(!r.ok) throw new Error(`Fetch ${r.status}`); return r.json(); };
 
   async function analyze(){
-    setError(null); setLoading(true); setShowDiff(false);
+    setError(null); setLoading(true);
     try{
       const old = oldFile ? await loadJsonFromFile(oldFile) : oldUrl ? await loadJsonFromUrl(oldUrl) : null;
       const new_ = newFile ? await loadJsonFromFile(newFile) : newUrl ? await loadJsonFromUrl(newUrl) : null;
@@ -201,175 +136,245 @@ export default function Page() {
   function loadSamples(){ setOldUrl("/samples/v1.json"); setNewUrl("/samples/v2.json"); }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="mx-auto max-w-5xl p-6 space-y-4">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">API Migration Copilot </h1>
-          <button onClick={loadSamples} className="rounded border px-3 py-1 text-sm">Load samples</button>
-        </header>
-
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Old API (URL or file)</label>
-              <input className="w-full rounded border p-2" placeholder="https://restcountries.com/v2/name/japan"
-                     value={oldUrl} onChange={e=>setOldUrl(e.target.value)} />
-              <input type="file" accept="application/json" onChange={e=>setOldFile(e.target.files?.[0]||null)} />
+    <div className="min-h-screen bg-white">
+      {/* Fixed Red Header Bar - StateFarm style */}
+      <header className="bg-[#D62311] text-white shadow-md">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              <Image 
+                src="/samples/logo.png" 
+                alt="State Farm Logo" 
+                width={40} 
+                height={40}
+                className="object-contain"
+              />
+              <h1 className="text-xl font-bold">API Migration Copilot</h1>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">New API (URL or file)</label>
-              <input className="w-full rounded border p-2" placeholder="https://restcountries.com/v3.1/name/japan"
-                     value={newUrl} onChange={e=>setNewUrl(e.target.value)} />
-              <input type="file" accept="application/json" onChange={e=>setNewFile(e.target.files?.[0]||null)} />
+            <div className="flex items-center gap-6">
+              <button 
+                onClick={loadSamples}
+                className="text-sm hover:underline"
+              >
+                Load Samples
+              </button>
             </div>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button onClick={analyze} disabled={loading} className="rounded-xl bg-black px-4 py-2 text-white">
-              {loading?"Analyzing…":"Analyze"}
-            </button>
-            {error && <span className="text-sm text-red-600">{error}</span>}
           </div>
         </div>
+      </header>
 
-        {oldJson && newJson && (
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-semibold mb-3">JSON Preview</h2>
-            {report && (
-              <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block w-6 h-4 bg-red-100 border-l-4 border-red-500 rounded-r"></span>
-                  <span>Removed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-block w-6 h-4 bg-green-100 border-l-4 border-green-500 rounded-r"></span>
-                  <span>Added</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-block w-6 h-4 bg-amber-100 border-l-4 border-amber-500 rounded-r"></span>
-                  <span>Risky (Type Changed)</span>
-                </div>
-              </div>
-            )}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="text-sm font-medium text-slate-600 mb-2">Old JSON</div>
-                <div className="overflow-auto max-h-96 rounded border bg-slate-50 p-3 text-xs font-mono">
-                  {report ? renderJsonWithHighlights(oldJson, report, true) : <pre className="whitespace-pre">{formatJson(oldJson)}</pre>}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-600 mb-2">New JSON</div>
-                <div className="overflow-auto max-h-96 rounded border bg-slate-50 p-3 text-xs font-mono">
-                  {report ? renderJsonWithHighlights(newJson, report, false) : <pre className="whitespace-pre">{formatJson(newJson)}</pre>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {report && typeof score==="number" && (
-          <>
-            <div className="flex items-center justify-between rounded-2xl border bg-white p-4 shadow-sm">
-              <div>
-                <div className="text-sm text-slate-500">Migration Risk</div>
-                <div className="text-2xl font-bold">{score}/100</div>
-              </div>
-              <div className="flex gap-6 text-sm">
-                <div>Added <span className="font-semibold">{report.summary.added}</span></div>
-                <div>Removed <span className="font-semibold">{report.summary.removed}</span></div>
-                <div>Risky <span className="font-semibold">{report.summary.risky}</span></div>
-              </div>
-              <span className={`rounded-full px-3 py-1 text-white ${
-                score<31?"bg-emerald-600":score<71?"bg-amber-500":"bg-rose-600"
-              }`}>{score<31?"Low":score<71?"Medium":"High"}</span>
+      {/* Main Content Area - Two Column Layout */}
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Main Heading */}
+            <div>
+              <h2 className="text-4xl font-bold text-[#D62311] mb-2">API Schema Migration Analysis</h2>
+              <h3 className="text-3xl font-bold text-black mb-4">Compare Your API Versions with Confidence</h3>
+              <p className="text-base text-gray-700 leading-relaxed mb-4">
+                Analyze and compare API schema changes to identify breaking changes, new fields, and migration risks. 
+                Get detailed insights into what's changed between API versions and understand the impact on your integration.
+              </p>
+              <p className="text-base text-gray-700 leading-relaxed">
+                Our migration analysis tool helps you understand schema differences, assess migration risks, and plan your API updates effectively.
+              </p>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-              <div className="flex items-center justify-between bg-slate-50 p-3 border-b">
-                <h2 className="text-lg font-semibold">Change Summary</h2>
-                <button 
-                  onClick={() => setShowDiff(!showDiff)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  {showDiff ? "Hide" : "Show"} GitHub-style Diff
-                </button>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr><th className="p-3 text-left">Path</th><th className="p-3 text-left">Change</th><th className="p-3 text-left">Details</th></tr>
-                </thead>
-                <tbody>
-                  {report.changes.map((c,i)=>(
-                    <tr key={i} className="border-t">
-                      <td className="p-3 font-mono">{(c as any).path}</td>
-                      <td className="p-3">{c.kind}</td>
-                      <td className="p-3">
-                        {"oldType" in c && "newType" in c ? `${(c as any).oldType} → ${(c as any).newType}` :
-                         "oldType" in c ? (c as any).oldType :
-                         "newType" in c ? (c as any).newType : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {showDiff && oldJson && newJson && (
-              <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-                <div className="bg-slate-50 p-3 border-b">
-                  <h2 className="text-lg font-semibold">GitHub-style Diff View</h2>
+            {/* Results Section - Only show when we have results */}
+            {oldJson && newJson && (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-2xl font-bold text-[#D62311] mb-3">Schema Comparison</h4>
+                  <p className="text-base text-gray-700 mb-4">Side-by-side comparison of your API schemas</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <div className="grid grid-cols-2">
-                    <div className="border-r">
-                      <div className="bg-red-50 text-xs font-semibold px-4 py-2 border-b text-red-900 sticky top-0">Old JSON</div>
-                      <div className="font-mono text-xs">
-                        {generateDiffLines(oldJson, newJson).map((line, i) => (
-                          <div
-                            key={i}
-                            className={`px-4 py-0.5 flex items-start min-h-[20px] ${
-                              line.type === "removed" ? "bg-red-50 text-red-900" : "bg-white"
-                            }`}
-                          >
-                            <span className="text-slate-400 mr-4 select-none w-10 text-right shrink-0">
-                              {line.type === "removed" || line.type === "unchanged" ? line.oldNum : ""}
-                            </span>
-                            <span className={`mr-2 select-none shrink-0 ${
-                              line.type === "removed" ? "text-red-600" : "text-transparent"
-                            }`}>-</span>
-                            <span className="flex-1 break-all">{line.type !== "added" ? (line.oldLine || "") : "\u00A0"}</span>
+                
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <h5 className="text-lg font-semibold text-gray-900">JSON Schema Preview</h5>
+                      {report && (
+                        <div className="flex flex-wrap gap-4 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-4 h-4 bg-red-50 border-l-4 border-[#D62311] rounded-r"></span>
+                            <span className="text-gray-700 font-medium">Removed</span>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-4 h-4 bg-green-50 border-l-4 border-green-600 rounded-r"></span>
+                            <span className="text-gray-700 font-medium">Added</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-4 h-4 bg-amber-50 border-l-4 border-amber-600 rounded-r"></span>
+                            <span className="text-gray-700 font-medium">Risky</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 p-4">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200">Old Schema</div>
+                      <div className="overflow-auto max-h-96 rounded border border-gray-200 bg-gray-50 p-3 text-xs font-mono leading-relaxed">
+                        {report ? renderJsonWithHighlights(oldJson, report, true) : <pre className="whitespace-pre text-gray-800">{formatJson(oldJson)}</pre>}
                       </div>
                     </div>
                     <div>
-                      <div className="bg-green-50 text-xs font-semibold px-4 py-2 border-b text-green-900 sticky top-0">New JSON</div>
-                      <div className="font-mono text-xs">
-                        {generateDiffLines(oldJson, newJson).map((line, i) => (
-                          <div
-                            key={i}
-                            className={`px-4 py-0.5 flex items-start min-h-[20px] ${
-                              line.type === "added" ? "bg-green-50 text-green-900" : "bg-white"
-                            }`}
-                          >
-                            <span className="text-slate-400 mr-4 select-none w-10 text-right shrink-0">
-                              {line.type === "added" || line.type === "unchanged" ? line.newNum : ""}
-                            </span>
-                            <span className={`mr-2 select-none shrink-0 ${
-                              line.type === "added" ? "text-green-600" : "text-transparent"
-                            }`}>+</span>
-                            <span className="flex-1 break-all">{line.type !== "removed" ? (line.newLine || "") : "\u00A0"}</span>
-                          </div>
-                        ))}
+                      <div className="text-sm font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200">New Schema</div>
+                      <div className="overflow-auto max-h-96 rounded border border-gray-200 bg-gray-50 p-3 text-xs font-mono leading-relaxed">
+                        {report ? renderJsonWithHighlights(newJson, report, false) : <pre className="whitespace-pre text-gray-800">{formatJson(newJson)}</pre>}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-          </>
-        )}
-      </div>
-    </main>
+
+            {report && typeof score==="number" && (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-2xl font-bold text-black mb-3">Migration Risk Assessment</h4>
+                  <p className="text-base text-gray-700">Comprehensive analysis of schema changes and migration risks</p>
+                </div>
+
+                {/* Risk Score Card */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-1">Migration Risk Score</div>
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-5xl font-bold text-gray-900">{score}</div>
+                        <div className="text-2xl text-gray-500">/100</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-8">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-600 font-medium mb-1">Added</span>
+                        <span className="text-2xl font-bold text-green-600">{report.summary.added}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-600 font-medium mb-1">Removed</span>
+                        <span className="text-2xl font-bold text-[#D62311]">{report.summary.removed}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-600 font-medium mb-1">Risky</span>
+                        <span className="text-2xl font-bold text-amber-600">{report.summary.risky}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      <span className={`inline-flex items-center rounded-full px-6 py-3 text-base font-bold text-white ${
+                        score<31?"bg-green-600":score<71?"bg-amber-500":"bg-[#D62311]"
+                      }`}>
+                        {score<31?"Low Risk":score<71?"Medium Risk":"High Risk"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Change Summary Table */}
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-[#D62311] px-6 py-4">
+                    <h5 className="text-lg font-semibold text-white">Change Summary</h5>
+                    <p className="text-sm text-red-100 mt-1">Detailed breakdown of schema differences</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Path</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Change Type</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {report.changes.map((c,i)=>(
+                          <tr key={i} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 font-mono text-xs text-gray-900">{(c as any).path}</td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                c.kind === "REMOVED_FIELD" ? "bg-red-100 text-red-800" :
+                                c.kind === "ADDED_FIELD" ? "bg-green-100 text-green-800" :
+                                "bg-amber-100 text-amber-800"
+                              }`}>
+                                {c.kind.replace(/_/g, " ")}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-gray-700">
+                              {"oldType" in c && "newType" in c ? (
+                                <span className="font-medium">{`${(c as any).oldType} → ${(c as any).newType}`}</span>
+                              ) : "oldType" in c ? (
+                                <span className="text-red-700 font-medium">{(c as any).oldType}</span>
+                              ) : "newType" in c ? (
+                                <span className="text-green-700 font-medium">{(c as any).newType}</span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Form Panel (Light Gray Background) */}
+          <div className="lg:col-span-1">
+            <div className="bg-gray-100 rounded-lg p-6 sticky top-4">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Ready to analyze your APIs?</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Old API (URL or file)</label>
+                  <input 
+                    className="w-full rounded border border-gray-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#D62311] focus:border-transparent" 
+                    placeholder="Enter URL or select file"
+                    value={oldUrl} 
+                    onChange={e=>setOldUrl(e.target.value)} 
+                  />
+                  <input 
+                    type="file" 
+                    accept="application/json" 
+                    onChange={e=>setOldFile(e.target.files?.[0]||null)}
+                    className="w-full mt-2 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:text-sm file:font-semibold file:bg-white file:text-[#D62311] file:border file:border-[#D62311] hover:file:bg-gray-50 cursor-pointer"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">New API (URL or file)</label>
+                  <input 
+                    className="w-full rounded border border-gray-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#D62311] focus:border-transparent" 
+                    placeholder="Enter URL or select file"
+                    value={newUrl} 
+                    onChange={e=>setNewUrl(e.target.value)} 
+                  />
+                  <input 
+                    type="file" 
+                    accept="application/json" 
+                    onChange={e=>setNewFile(e.target.files?.[0]||null)}
+                    className="w-full mt-2 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:text-sm file:font-semibold file:bg-white file:text-[#D62311] file:border file:border-[#D62311] hover:file:bg-gray-50 cursor-pointer"
+                  />
+                </div>
+
+                {error && (
+                  <div className="px-4 py-3 bg-red-50 border border-red-200 rounded">
+                    <span className="text-sm font-medium text-red-800">{error}</span>
+                  </div>
+                )}
+
+                <button 
+                  onClick={analyze} 
+                  disabled={loading} 
+                  className="w-full py-4 bg-[#D62311] text-white font-bold rounded-lg hover:bg-[#B41D0E] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 text-base"
+                >
+                  {loading ? "Analyzing…" : "Analyze APIs"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
