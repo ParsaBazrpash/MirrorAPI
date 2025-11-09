@@ -72,10 +72,10 @@ export default function SignInPage() {
         <div className={`max-w-md w-full ${cardBgColor} rounded-lg shadow-lg p-8 border ${borderColor} transition-colors`}>
           <div className="text-center mb-8">
             <h1 className={`text-3xl font-bold ${primaryTextColor} mb-2 transition-colors`}>
-              Welcome to API Migration Copilot
+              Welcome to MirrorAPI
             </h1>
             <p className={mutedTextColor}>
-              Sign in to get started with API schema comparison and migration
+              Sign in to get started with API schema migration analysis
             </p>
           </div>
 
