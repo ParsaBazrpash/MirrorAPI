@@ -1,0 +1,82 @@
+{
+  "policy_id": "SF-POL-2024-789456",
+  "policy_number": "POL-789456",
+  "customer": {
+    "customer_id": "CUST-12345",
+    "full_name": "Michael Chen",
+    "email": "michael.chen@email.com",
+    "phone": null,
+    "date_of_birth": null,
+    "ssn": null,
+    "address": {
+      "street": null,
+      "city": "Dallas",
+      "state": "TX",
+      "zip_code": "75201",
+      "country": "USA"
+    }
+  },
+  "policy_details": {
+    "policy_type": "auto",
+    "effective_date": "2024-01-15",
+    "expiration_date": null,
+    "status": "active",
+    "premium_amount": 1245.75,
+    "deductible": null,
+    "coverage_limits": {
+      "bodily_injury": 250000,
+      "property_damage": null,
+      "uninsured_motorist": 250000
+    }
+  },
+  "vehicle": {
+    "vin": "1HGBH41JXMN109186",
+    "make": "Honda",
+    "model": "Accord",
+    "year": 2022,
+    "color": null,
+    "mileage": null,
+    "license_plate": "TX-ABC123"
+  },
+  "coverage": {
+    "collision": true,
+    "comprehensive": true,
+    "liability": true,
+    "personal_injury_protection": null,
+    "roadside_assistance": true
+  },
+  "claims": {
+    "total_claims": 2,
+    "total_payout": null,
+    "last_claim_date": "2024-06-10",
+    "claims_history": [
+      {
+        "claim_id": "CLM-001",
+        "date": "2024-03-15",
+        "amount": null,
+        "type": "collision"
+      },
+      {
+        "claim_id": "CLM-002",
+        "date": "2024-06-10",
+        "amount": 1000.00,
+        "type": "comprehensive"
+      }
+    ]
+  },
+  "payment": {
+    "payment_method": "credit_card",
+    "billing_cycle": "monthly",
+    "next_payment_date": null,
+    "last_payment_date": "2024-11-20",
+    "last_payment_amount": 103.81,
+    "outstanding_balance": null
+  },
+  "metadata": {
+    "created_at": "2024-01-10T08:30:00Z",
+    "updated_at": "2024-11-20T16:45:00Z",
+    "agent_id": null,
+    "agent_name": "Jennifer Martinez"
+  }
+}
+
