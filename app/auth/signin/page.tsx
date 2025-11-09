@@ -40,9 +40,15 @@ export default function SignInPage() {
                 alt="State Farm Logo" 
                 width={40} 
                 height={40}
-                className="object-contain"
+                className="object-contain cursor-pointer"
+                onClick={() => router.push('/')}
               />
-              <h1 className="text-xl font-bold">MirrorAPI</h1>
+              <button
+                onClick={() => router.push('/')}
+                className="text-xl font-bold hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                MirrorAPI
+              </button>
             </div>
           </div>
         </div>
